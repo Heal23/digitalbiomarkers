@@ -3,6 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 import ast  # For safely evaluating the string
+import mne
+from mne.preprocessing import ICA
+from mne.filter import filter_data
+
+plt.ion()  # Turn on interactive mode
 
 # Load the CSV files
 long_blink_data = pd.read_csv('C:/dev/digitalbiomarkers/EEG-data/LongBlink.csv')
@@ -16,6 +21,8 @@ print(tabulate(long_blink_data.head(), headers='keys', tablefmt='grid'))
 print("\nTable for ShortBlink.csv:")
 print(tabulate(short_blink_data.head(), headers='keys', tablefmt='grid'))
 
+
+
 # Convert string representations to actual lists
 long_blink_data['data'] = long_blink_data['data'].apply(ast.literal_eval)
 short_blink_data['data'] = short_blink_data['data'].apply(ast.literal_eval)
@@ -28,59 +35,41 @@ short_blink_values = [value for sublist in short_blink_data['data'].tolist() for
 long_blink_sessions = [long_blink_values[i:i + 510] for i in range(0, len(long_blink_values), 510)]
 short_blink_sessions = [short_blink_values[i:i + 510] for i in range(0, len(short_blink_values), 510)]
 
-# 1.2 Data Description
+# Convert sessions into numpy arrays
+long_blink_array = np.array(long_blink_sessions)
+short_blink_array = np.array(short_blink_sessions)
 
-# Compute Average amplitude and standard deviation
-avg_amplitudes_long = np.mean(long_blink_sessions, axis=1)
-avg_amplitudes_short = np.mean(short_blink_sessions, axis=1)
+# Filter the EEG data
+# Typically, for EEG, a 1-50 Hz bandpass filter is applied.
+sfreq = 250  # assuming a sampling frequency of 250 Hz
+fmin, fmax = 1, 50  # frequency band
+long_blink_array_filtered = filter_data(long_blink_array.T, sfreq, fmin, fmax).T
+short_blink_array_filtered = filter_data(short_blink_array.T, sfreq, fmin, fmax).T
 
-std_devs_long = np.std(long_blink_sessions, axis=1)
-std_devs_short = np.std(short_blink_sessions, axis=1)
+# Define a function to plot linked sessions for each channel
+def plot_linked_sessions(data_array, title):
+    fig, axs = plt.subplots(4, 1, figsize=(8, 12))  # 4 channels
 
-print(f"Average amplitude for Long Blink sessions: {np.mean(avg_amplitudes_long):.2f}")
-print(f"Average amplitude for Short Blink sessions: {np.mean(avg_amplitudes_short):.2f}")
-print(f"Standard deviation for Long Blink sessions: {np.mean(std_devs_long):.2f}")
-print(f"Standard deviation for Short Blink sessions: {np.mean(std_devs_short):.2f}")
+    for channel_idx in range(4):  # loop over 4 channels
+        # Plotting for blink data
+        blink_data = np.concatenate([data_array[session_idx * 4 + channel_idx] for session_idx in range(20)])  # link first 5 sessions for the current channel
+        axs[channel_idx].plot(blink_data)
+        axs[channel_idx].set_title(f"Channel {channel_idx + 1}")
+        axs[channel_idx].set_xticks([])  # remove x-ticks for clarity
 
-# Frequency distribution (Fourier Transform) for the first session as an example
-sampling_rate = 250
-frequencies = np.fft.rfftfreq(510, d=1./sampling_rate)  # For a session of length 510
-fft_values_long = np.fft.rfft(long_blink_sessions[0])
-fft_values_short = np.fft.rfft(short_blink_sessions[0])
-
-plt.figure(figsize=(10, 5))
-plt.plot(frequencies, np.abs(fft_values_long)**2, label='Long Blink')
-plt.plot(frequencies, np.abs(fft_values_short)**2, label='Short Blink')
-plt.title("Power Spectral Density of the First Session")
-plt.xlabel("Frequency (Hz)")
-plt.ylabel("Power")
-plt.xlim([0, 60])
-plt.legend()
-plt.show()
-
-# Continue with your plotting function
-
-def plot_eeg_sessions_on_single_plot(sessions, title_prefix):
-    # Create a large figure with multiple subplots
-    fig, axs = plt.subplots(len(sessions), 1, figsize=(10, len(sessions) * 1.5))
-    fig.suptitle(title_prefix + ' EEG Sessions', y=1.02)
+    axs[0].set_ylabel('EEG Value')
+    axs[1].set_ylabel('EEG Value')
+    axs[2].set_ylabel('EEG Value')
+    axs[3].set_ylabel('EEG Value')
     
-    # Loop over each session and plot it on its respective subplot
-    for idx, session in enumerate(sessions):
-        axs[idx].plot(session)
-        
-        # Set the y-axis label to be the session title
-        axs[idx].set_ylabel(f'Session {idx + 1}', rotation=0, labelpad=30, verticalalignment='center', fontsize=10)
-        
-        # Remove x-axis labels and ticks for clarity
-        axs[idx].set_xticks([])
-        axs[idx].set_yticks([])
-        
-    # Adjust spacing between plots
     plt.tight_layout()
+    plt.subplots_adjust(top=0.95)
+    fig.suptitle(title)
+    plt.draw()  # Use draw instead of show
 
-# Plot sessions for LongBlink.csv and ShortBlink.csv, only the first 20 sessions
-plot_eeg_sessions_on_single_plot(long_blink_sessions[:20], 'Long Blink')
-plot_eeg_sessions_on_single_plot(short_blink_sessions[:20], 'Short Blink')
+# Call the functions to plot
+plot_linked_sessions(long_blink_array, "EEG Data Linked Sessions - Long Blink")
+plot_linked_sessions(short_blink_array, "EEG Data Linked Sessions - Short Blink")
 
-plt.show()
+# Optionally, you can put this at the end to block execution until all figures are closed
+plt.show(block=True)
