@@ -39,12 +39,20 @@ short_blink_sessions = [short_blink_values[i:i + 510] for i in range(0, len(shor
 long_blink_array = np.array(long_blink_sessions)
 short_blink_array = np.array(short_blink_sessions)
 
-# Filter the EEG data
-# Typically, for EEG, a 1-50 Hz bandpass filter is applied.
-sfreq = 250  # assuming a sampling frequency of 250 Hz
-fmin, fmax = 1, 50  # frequency band
-long_blink_array_filtered = filter_data(long_blink_array.T, sfreq, fmin, fmax).T
-short_blink_array_filtered = filter_data(short_blink_array.T, sfreq, fmin, fmax).T
+
+# Define a function to apply a band-pass filter
+def apply_bandpass_filter(data, l_freq=1.0, h_freq=40.0):
+    sfreq = 250.0  # Define the sampling frequency
+    data_filtered = mne.filter.filter_data(data, sfreq, l_freq, h_freq, method='fir', fir_design='firwin', verbose=False)
+    return data_filtered
+
+
+
+# Filter the data
+long_blink_array_filtered = apply_bandpass_filter(long_blink_array)
+short_blink_array_filtered = apply_bandpass_filter(short_blink_array)
+
+
 
 # Define a function to plot linked sessions for each channel
 def plot_linked_sessions(data_array, title):
@@ -67,9 +75,13 @@ def plot_linked_sessions(data_array, title):
     fig.suptitle(title)
     plt.draw()  # Use draw instead of show
 
-# Call the functions to plot
-plot_linked_sessions(long_blink_array, "EEG Data Linked Sessions - Long Blink")
-plot_linked_sessions(short_blink_array, "EEG Data Linked Sessions - Short Blink")
+# Call the functions to plot the unfiltered data
+plot_linked_sessions(long_blink_array, "EEG Data Linked Sessions - Long Blink (Non-filtered)")
+plot_linked_sessions(short_blink_array, "EEG Data Linked Sessions - Short Blink (Non-filtered)")
+
+# Call the functions to plot the filtered data
+plot_linked_sessions(long_blink_array_filtered, "EEG Data Linked Sessions - Long Blink (Filtered)")
+plot_linked_sessions(short_blink_array_filtered, "EEG Data Linked Sessions - Short Blink (Filtered)")
 
 # Optionally, you can put this at the end to block execution until all figures are closed
 plt.show(block=True)
