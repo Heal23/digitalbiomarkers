@@ -6,6 +6,13 @@ import ast  # For safely evaluating the string
 import mne
 from scipy.signal import find_peaks
 from scipy.signal import welch
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.utils import to_categorical
+
 
 plt.ion()  # Turn on interactive mode
 
@@ -37,7 +44,7 @@ long_blink_array = np.array(long_blink_sessions)
 short_blink_array = np.array(short_blink_sessions)
 
 # Apply bandpass filter
-def apply_bandpass_filter(data, l_freq=1.0, h_freq=40.0):
+def apply_bandpass_filter(data, l_freq=0.1, h_freq=5.0):
     sfreq = 250.0
     data_filtered = mne.filter.filter_data(data, sfreq, l_freq, h_freq, method='iir', verbose=False)
     return data_filtered
@@ -66,7 +73,7 @@ plot_linked_sessions(short_blink_array_filtered, "EEG Data Linked Sessions - Sho
 
 plt.show(block=True)
 
-print(np.array(long_blink_array_filtered).shape)
+
 
 
 # Feature Extraction function
@@ -159,3 +166,83 @@ for key in short_blink_avg_features_per_channel:
     print(f"Variance: {short_blink_avg_features_per_channel[key][2]}")
     print(f"Dominant Frequency: {short_blink_avg_features_per_channel[key][3]} Hz")
     print(f"Bandwidth: {short_blink_avg_features_per_channel[key][4]} Hz\n")
+
+
+   # Preparing Dataset
+
+# 1. Label the data
+# 0 for short blink, 1 for long blink
+labels_short = np.zeros(short_blink_features_per_channel["Channel_1"].shape[0])
+labels_long = np.ones(long_blink_features_per_channel["Channel_1"].shape[0])
+
+# 2. Merge data from both blink types
+all_features = []
+for channel in ["Channel_1", "Channel_2", "Channel_3", "Channel_4"]:
+    all_features_channel = np.vstack([short_blink_features_per_channel[channel], long_blink_features_per_channel[channel]])
+    all_features.append(all_features_channel)
+
+all_features = np.hstack(all_features)  # Combining features from all channels
+all_labels = np.hstack([labels_short, labels_long])
+
+# 3. Split dataset 70/30
+X_train, X_test, y_train, y_test = train_test_split(all_features, all_labels, test_size=0.3, random_state=42)
+
+print("Dataset successfully split into training and testing sets.")
+
+"""# Train the model
+clf = RandomForestClassifier(n_estimators=100, random_state=42)
+clf.fit(X_train, y_train)
+
+# Predict on the test set
+y_pred = clf.predict(X_test)
+
+# Evaluate the model
+accuracy = accuracy_score(y_test, y_pred)
+conf_matrix = confusion_matrix(y_test, y_pred)
+
+print("\nModel Performance:")
+print(f"Accuracy: {accuracy * 100:.2f}%")
+print("\nConfusion Matrix:")
+print(conf_matrix)
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred)) """
+
+# Convert the labels to one-hot encoding
+y_train_categorical = to_categorical(y_train)
+y_test_categorical = to_categorical(y_test)
+
+# Build a simple neural network model
+model = Sequential()
+
+# Add input layer (assuming X_train has shape (num_samples, num_features))
+model.add(Dense(128, input_dim=X_train.shape[1], activation='relu'))
+
+# Add hidden layer
+model.add(Dense(64, activation='relu'))
+
+# Add output layer
+model.add(Dense(2, activation='softmax'))  # 2 classes: short and long blink
+
+# Compile the model
+model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+# Train the model
+model.fit(X_train, y_train_categorical, epochs=50, batch_size=10)
+
+# Evaluate the model
+loss, accuracy = model.evaluate(X_test, y_test_categorical)
+
+# Predict on the test set
+y_pred_probabilities = model.predict(X_test)
+y_pred = np.argmax(y_pred_probabilities, axis=1)
+
+# Print results
+print("\nModel Performance:")
+print(f"Accuracy: {accuracy * 100:.2f}%")
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+
