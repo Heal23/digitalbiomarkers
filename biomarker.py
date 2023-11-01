@@ -45,7 +45,7 @@ short_blink_array = np.array(short_blink_sessions)
 
 # Apply bandpass filter
 def apply_bandpass_filter(data, l_freq=0.1, h_freq=5.0):
-    sfreq = 250.0
+    sfreq = 215.0
     data_filtered = mne.filter.filter_data(data, sfreq, l_freq, h_freq, method='iir', verbose=False)
     return data_filtered
 
@@ -56,7 +56,7 @@ short_blink_array_filtered = apply_bandpass_filter(short_blink_array)
 def plot_linked_sessions(data_array, title):
     fig, axs = plt.subplots(4, 1, figsize=(8, 12))
     for channel_idx in range(4):
-        blink_data = np.concatenate([data_array[session_idx * 4 + channel_idx] for session_idx in range(20)])
+        blink_data = np.concatenate([data_array[session_idx * 4 + channel_idx] for session_idx in range(1)])
         axs[channel_idx].plot(blink_data)
         axs[channel_idx].set_title(f"Channel {channel_idx + 1}")
         axs[channel_idx].set_xticks([])
@@ -187,6 +187,7 @@ all_labels = np.hstack([labels_short, labels_long])
 # 3. Split dataset 70/30
 X_train, X_test, y_train, y_test = train_test_split(all_features, all_labels, test_size=0.3, random_state=42)
 
+
 print("Dataset successfully split into training and testing sets.")
 
 """# Train the model
@@ -244,5 +245,7 @@ print("\nConfusion Matrix:")
 print(confusion_matrix(y_test, y_pred))
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
+
+# store the model (dump thwe model) 
 
 
