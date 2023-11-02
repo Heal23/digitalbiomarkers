@@ -13,6 +13,7 @@ from keras.layers import Dense, Dropout
 from keras.utils import to_categorical
 from keras.callbacks import History
 from sklearn.model_selection import StratifiedKFold
+from keras.regularizers import l2
 
 
 plt.ion()  # Turn on interactive mode
