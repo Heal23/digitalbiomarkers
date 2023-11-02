@@ -7,11 +7,12 @@ import mne
 from scipy.signal import find_peaks
 from scipy.signal import welch
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, Dropout
 from keras.utils import to_categorical
+from keras.callbacks import History
+from sklearn.model_selection import StratifiedKFold
 
 
 plt.ion()  # Turn on interactive mode
@@ -56,7 +57,7 @@ short_blink_array_filtered = apply_bandpass_filter(short_blink_array)
 def plot_linked_sessions(data_array, title):
     fig, axs = plt.subplots(4, 1, figsize=(8, 12))
     for channel_idx in range(4):
-        blink_data = np.concatenate([data_array[session_idx * 4 + channel_idx] for session_idx in range(1)])
+        blink_data = np.concatenate([data_array[session_idx * 4 + channel_idx] for session_idx in range(20)])
         axs[channel_idx].plot(blink_data)
         axs[channel_idx].set_title(f"Channel {channel_idx + 1}")
         axs[channel_idx].set_xticks([])
@@ -170,82 +171,67 @@ for key in short_blink_avg_features_per_channel:
 
    # Preparing Dataset
 
-# 1. Label the data
-# 0 for short blink, 1 for long blink
-labels_short = np.zeros(short_blink_features_per_channel["Channel_1"].shape[0])
-labels_long = np.ones(long_blink_features_per_channel["Channel_1"].shape[0])
-
-# 2. Merge data from both blink types
+# 1. Merge data from both blink types and label them
 all_features = []
 for channel in ["Channel_1", "Channel_2", "Channel_3", "Channel_4"]:
     all_features_channel = np.vstack([short_blink_features_per_channel[channel], long_blink_features_per_channel[channel]])
     all_features.append(all_features_channel)
 
 all_features = np.hstack(all_features)  # Combining features from all channels
+
+labels_short = np.zeros(short_blink_features_per_channel["Channel_1"].shape[0])
+labels_long = np.ones(long_blink_features_per_channel["Channel_1"].shape[0])
 all_labels = np.hstack([labels_short, labels_long])
 
-# 3. Split dataset 70/30
-X_train, X_test, y_train, y_test = train_test_split(all_features, all_labels, test_size=0.3, random_state=42)
+# 2. Split the dataset
+X_train, X_test, y_train, y_test = train_test_split(all_features, all_labels, test_size=0.3)
 
-
-print("Dataset successfully split into training and testing sets.")
-
-"""# Train the model
-clf = RandomForestClassifier(n_estimators=100, random_state=42)
-clf.fit(X_train, y_train)
-
-# Predict on the test set
-y_pred = clf.predict(X_test)
-
-# Evaluate the model
-accuracy = accuracy_score(y_test, y_pred)
-conf_matrix = confusion_matrix(y_test, y_pred)
-
-print("\nModel Performance:")
-print(f"Accuracy: {accuracy * 100:.2f}%")
-print("\nConfusion Matrix:")
-print(conf_matrix)
-
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred)) """
-
-# Convert the labels to one-hot encoding
+# Convert labels to one-hot encoding for training
 y_train_categorical = to_categorical(y_train)
-y_test_categorical = to_categorical(y_test)
 
-# Build a simple neural network model
+# 3. Build the Neural Network with modifications
 model = Sequential()
-
-# Add input layer (assuming X_train has shape (num_samples, num_features))
 model.add(Dense(128, input_dim=X_train.shape[1], activation='relu'))
-
-# Add hidden layer
+model.add(Dropout(0.5))
 model.add(Dense(64, activation='relu'))
-
-# Add output layer
-model.add(Dense(2, activation='softmax'))  # 2 classes: short and long blink
-
-# Compile the model
+model.add(Dropout(0.5))
+model.add(Dense(2, activation='softmax'))
 model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
-# Train the model
-model.fit(X_train, y_train_categorical, epochs=50, batch_size=10)
+# Cross-validation
+kfold = StratifiedKFold(n_splits=5, shuffle=True)
+cv_scores = []
 
-# Evaluate the model
-loss, accuracy = model.evaluate(X_test, y_test_categorical)
+for train, val in kfold.split(X_train, y_train):
+    y_train_k_categorical = to_categorical(y_train[train])
+    history: History = model.fit(X_train[train], y_train_k_categorical, epochs=50, batch_size=10, validation_data=(X_train[val], to_categorical(y_train[val])))
+    scores = model.evaluate(X_train[val], to_categorical(y_train[val]), verbose=0)
+    cv_scores.append(scores[1] * 100)
+    print(f"Fold Accuracy: {scores[1]*100:.2f}%")
 
-# Predict on the test set
+print(f"Mean Accuracy: {np.mean(cv_scores):.2f}%, Standard Deviation: {np.std(cv_scores):.2f}%")
+
+# 4. Plot the learning curve
+plt.figure(figsize=(10, 5))
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Model Accuracy')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(loc='lower right')
+plt.show(block=True)
+
+# 5. Use the trained model to predict on the test set
 y_pred_probabilities = model.predict(X_test)
 y_pred = np.argmax(y_pred_probabilities, axis=1)
 
+# Compare the predictions with the true labels of the test set
+accuracy = accuracy_score(y_test, y_pred)
+
 # Print results
-print("\nModel Performance:")
+print("\nModel Performance on Test Data:")
 print(f"Accuracy: {accuracy * 100:.2f}%")
 print("\nConfusion Matrix:")
 print(confusion_matrix(y_test, y_pred))
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
-
-# store the model (dump thwe model) 
-
-
