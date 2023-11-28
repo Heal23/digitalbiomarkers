@@ -236,3 +236,9 @@ print("\nConfusion Matrix:")
 print(confusion_matrix(y_test, y_pred))
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
+
+# Save the model
+model_save_path = 'C:/dev/digitalbiomarkers/blink_model.keras'
+model.save(model_save_path)
+print("Model saved at", model_save_path)
+
