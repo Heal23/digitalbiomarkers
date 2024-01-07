@@ -14,6 +14,7 @@ from keras.utils import to_categorical
 from keras.callbacks import History
 from sklearn.model_selection import StratifiedKFold
 from keras.regularizers import l2
+from sklearn.tree import DecisionTreeClassifier
 
 
 plt.ion()  # Turn on interactive mode
@@ -188,57 +189,35 @@ all_labels = np.hstack([labels_short, labels_long])
 X_train, X_test, y_train, y_test = train_test_split(all_features, all_labels, test_size=0.3)
 
 # Convert labels to one-hot encoding for training
-y_train_categorical = to_categorical(y_train)
+# y_train_categorical = to_categorical(y_train)
 
-# 3. Build the Neural Network with modifications
-model = Sequential()
-model.add(Dense(64, input_dim=X_train.shape[1], activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(32, activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(2, activation='softmax'))
-model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+# Build and train the Decision Tree model
+model = DecisionTreeClassifier(random_state=42)
+model.fit(X_train, y_train)
 
-# Cross-validation
-kfold = StratifiedKFold(n_splits=5, shuffle=True)
-cv_scores = []
 
-for train, val in kfold.split(X_train, y_train):
-    y_train_k_categorical = to_categorical(y_train[train])
-    history: History = model.fit(X_train[train], y_train_k_categorical, epochs=30, batch_size=10, validation_data=(X_train[val], to_categorical(y_train[val])))
-    scores = model.evaluate(X_train[val], to_categorical(y_train[val]), verbose=0)
-    cv_scores.append(scores[1] * 100)
-    print(f"Fold Accuracy: {scores[1]*100:.2f}%")
 
-print(f"Mean Accuracy: {np.mean(cv_scores):.2f}%, Standard Deviation: {np.std(cv_scores):.2f}%")
 
-# 4. Plot the learning curve
-plt.figure(figsize=(10, 5))
-plt.plot(history.history['accuracy'], label='Training Accuracy')
-plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
-plt.title('Model Accuracy')
-plt.ylabel('Accuracy')
-plt.xlabel('Epoch')
-plt.legend(loc='lower right')
-plt.show(block=True)
+# Use the trained model to predict on the test set
+y_pred = model.predict(X_test)
 
-# 5. Use the trained model to predict on the test set
-y_pred_probabilities = model.predict(X_test)
-y_pred = np.argmax(y_pred_probabilities, axis=1)
 
-# Compare the predictions with the true labels of the test set
+# Evaluate the model
 accuracy = accuracy_score(y_test, y_pred)
+conf_matrix = confusion_matrix(y_test, y_pred)
+classification_rep = classification_report(y_test, y_pred)
 
 # Print results
 print("\nModel Performance on Test Data:")
 print(f"Accuracy: {accuracy * 100:.2f}%")
 print("\nConfusion Matrix:")
-print(confusion_matrix(y_test, y_pred))
+print(conf_matrix)
 print("\nClassification Report:")
-print(classification_report(y_test, y_pred))
+print(classification_rep)
 
 # Save the model
-model_save_path = 'C:/dev/digitalbiomarkers/blink_model.keras'
-model.save(model_save_path)
+# DecisionTree models are typically saved using joblib or pickle
+import joblib
+model_save_path = 'C:/dev/digitalbiomarkers/decision_tree_model.joblib'
+joblib.dump(model, model_save_path)
 print("Model saved at", model_save_path)
-
