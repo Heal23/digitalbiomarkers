@@ -45,7 +45,7 @@ model_path = 'C:/dev/digitalbiomarkers/blink_model.keras'
 model = load_model(model_path)
 
 # Load new combined blink data (unlabeled)
-new_data_path = 'C:\dev\digitalbiomarkers\EEG-data\ShortBlink.csv'
+new_data_path = 'C:\dev\digitalbiomarkers\EEG-data\'
 new_data = pd.read_csv(new_data_path)
 new_data['data'] = new_data['data'].apply(ast.literal_eval)
 
